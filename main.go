@@ -38,7 +38,27 @@ func getDirName(dir os.DirEntry) string {
 	return fmt.Sprintf("%s (%s)", dir.Name(), sizeText)
 }
 
-func renderTree(out io.Writer, path string, printFiles bool, level int, isLast bool) error {
+func filterFiles(dirs []os.DirEntry) []os.DirEntry {
+	newDirs := make([]os.DirEntry, 0, len(dirs))
+
+	for _, dir := range dirs {
+		if dir.IsDir() {
+			newDirs = append(newDirs, dir)
+		}
+	}
+
+	return newDirs
+}
+
+func getNodeChar(isLast bool) string {
+	if isLast {
+		return lastRoodNodeChar
+	}
+
+	return rootNodeChar
+}
+
+func renderTree(out io.Writer, path string, printFiles bool, level int, isLast bool, prevPrefix string) error {
 	file, err := os.Open(path)
 
 	if err != nil {
@@ -46,6 +66,10 @@ func renderTree(out io.Writer, path string, printFiles bool, level int, isLast b
 	}
 
 	dirs, _ := file.ReadDir(0)
+
+	if !printFiles {
+		dirs = filterFiles(dirs)
+	}
 
 	sort.Slice(dirs, func(i int, j int) bool {
 		return dirs[i].Name() < dirs[j].Name()
@@ -58,36 +82,25 @@ func renderTree(out io.Writer, path string, printFiles bool, level int, isLast b
 			return err
 		}
 
-		if !printFiles && !info.IsDir() {
-			continue
-		}
+		var prefix string = prevPrefix
 
 		if level > 0 {
-			for i := 0; i < level; i++ {
-				if !isLast {
-					fmt.Fprintf(out, "%s%c", separatorChar, tabChar)
-				} else {
-					if i < level-1 {
-						fmt.Fprintf(out, "%s%c", separatorChar, tabChar)
-					} else {
-						fmt.Fprintf(out, "%c", tabChar)
-					}
-				}
+			if !isLast {
+				prefix = fmt.Sprintf("%s%s%c", prefix, separatorChar, tabChar)
+			} else {
+				prefix = fmt.Sprintf("%s%c", prefix, tabChar)
 			}
 		}
 
-		var nodeChar string
+		currentIsLast := index == len(dirs)-1
 
-		if index == len(dirs)-1 {
-			nodeChar = lastRoodNodeChar
-		} else {
-			nodeChar = rootNodeChar
-		}
+		nodeChar := getNodeChar(currentIsLast)
 
+		fmt.Fprint(out, prefix)
 		fmt.Fprintf(out, "%s%s\n", nodeChar, getDirName(dir))
 
 		if info.IsDir() {
-			renderTree(out, fmt.Sprintf("%s%c%s", path, os.PathSeparator, dir.Name()), printFiles, level+1, index == len(dirs)-1)
+			renderTree(out, fmt.Sprintf("%s%c%s", path, os.PathSeparator, dir.Name()), printFiles, level+1, currentIsLast, prefix)
 		}
 	}
 
@@ -95,24 +108,7 @@ func renderTree(out io.Writer, path string, printFiles bool, level int, isLast b
 }
 
 func dirTree(out io.Writer, path string, printFiles bool) error {
-	err := renderTree(out, path, printFiles, 0, false)
-
-	if err != nil {
-		return err
-	}
-	// file, err := os.Open(path)
-
-	// if err != nil {
-	// 	return fmt.Errorf("path is not corrected")
-	// }
-
-	// dirs, _ := file.ReadDir(0)
-
-	// for _, dir := range dirs {
-	// 	renderTree(out, path, dir, 0)
-	// }
-
-	return nil
+	return renderTree(out, path, printFiles, 0, false, "")
 }
 
 func main() {
