@@ -1,3 +1,3 @@
-module hw
+module tree
 
 go 1.17
